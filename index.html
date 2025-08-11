@@ -1,239 +1,436 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>iTunes Style Multi-Folder Player</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>iTunes-style Multi-Folder Player</title>
 <style>
-  /* ===== iTunes-like Styling ===== */
-  body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #eaeaea;
-    color: #000;
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-  }
-  #sidebar {
-    width: 250px;
-    background: #f2f2f2;
-    border-right: 1px solid #ccc;
-    display: flex;
-    flex-direction: column;
-  }
-  #sidebar h2 {
-    font-size: 14px;
-    font-weight: bold;
-    padding: 8px;
-    margin: 0;
-    border-bottom: 1px solid #ccc;
-    background: #dcdcdc;
-  }
-  .folder-select, .playlist-item {
-    padding: 6px 10px;
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .folder-select:hover, .playlist-item:hover {
-    background: #cce0ff;
-  }
-  #main {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-  }
-  #searchBar {
-    padding: 8px;
-    border: none;
-    border-bottom: 1px solid #ccc;
-    font-size: 13px;
-  }
-  #fileList {
-    flex: 1;
-    overflow-y: auto;
-    background: white;
-  }
-  .item {
-    display: flex;
-    justify-content: space-between;
-    padding: 6px 10px;
-    border-bottom: 1px solid #eee;
-    font-size: 13px;
-    cursor: pointer;
-  }
-  .item:hover {
-    background: #f0f8ff;
-  }
-  .folder { font-weight: bold; }
-  #nowPlaying {
-    border-top: 1px solid #ccc;
-    background: #f2f2f2;
-    padding: 6px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    font-size: 13px;
-  }
-  audio {
-    flex: 1;
-  }
-  button {
-    border: none;
-    background: #ccc;
-    padding: 2px 6px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  button:hover {
-    background: #bbb;
+  /* iTunes-ish layout (no artwork, no EQ) */
+  :root { --sidebar: 260px; --accent:#0a84ff; }
+  html,body { height:100%; margin:0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#f2f2f4; color:#111; }
+  .app { display:flex; height:100vh; }
+  /* sidebar */
+  .sidebar { width:var(--sidebar); background:#efeff1; border-right:1px solid #ceced1; display:flex; flex-direction:column; }
+  .sidebar h3 { margin:0; padding:12px 14px; background:#e1e1e3; border-bottom:1px solid #d0d0d3; font-size:13px; }
+  .folder-list, .playlist-list { padding:8px; overflow:auto; flex:1; }
+  .folder-item, .playlist-item { padding:8px 10px; border-radius:4px; margin-bottom:6px; cursor:pointer; font-size:13px; }
+  .folder-item:hover, .playlist-item:hover { background:#dbeeff; }
+  .folder-item.active { background:#c7e0ff; font-weight:600; color:#003f7f; }
+  .sidebar .controls { padding:10px; border-top:1px solid #d8d8da; background:#efeff1; }
+  .sidebar button { width:100%; padding:8px; border-radius:6px; border:1px solid #cfcfcf; background:white; cursor:pointer; font-size:13px; }
+
+  /* main */
+  .main { flex:1; display:flex; flex-direction:column; }
+  .toolbar { display:flex; align-items:center; gap:12px; padding:10px; border-bottom:1px solid #dfdfe2; background:white; }
+  .search { flex:1; }
+  .search input { width:100%; padding:8px 10px; border-radius:6px; border:1px solid #d0d0d3; font-size:14px; }
+
+  /* track table */
+  .table-wrap { flex:1; overflow:auto; background:white; }
+  table.track-table { width:100%; border-collapse:collapse; }
+  table.track-table thead th { position:sticky; top:0; background:#f8f8f9; padding:10px; text-align:left; font-size:13px; border-bottom:1px solid #e6e6e8; cursor:pointer; user-select:none; }
+  table.track-table tbody tr { border-bottom:1px solid #f1f1f2; cursor:pointer; }
+  table.track-table tbody tr:hover { background:#f0f8ff; }
+  table.track-table td { padding:10px; font-size:13px; vertical-align:middle; }
+  .controls-cell button { margin-left:6px; }
+
+  /* now playing bar */
+  .nowbar { display:flex; align-items:center; gap:12px; padding:8px 12px; border-top:1px solid #dcdcdc; background:#fafafa; }
+  .now-info { min-width:200px; max-width:400px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .player-controls { display:flex; align-items:center; gap:8px; }
+  .big-btn { font-size:16px; padding:8px 10px; border-radius:6px; background:white; border:1px solid #ccc; cursor:pointer; }
+  .seek { flex:1; display:flex; align-items:center; gap:8px; }
+  .seek input[type=range] { width:100%; }
+  .small { font-size:12px; color:#666; }
+
+  /* tiny responsive */
+  @media (max-width:800px){
+    .sidebar { display:none; }
+    .now-info{ display:none; }
   }
 </style>
 </head>
 <body>
+<div class="app">
+  <!-- SIDEBAR -->
+  <div class="sidebar" role="navigation" aria-label="Folders and playlists">
+    <h3>Folders</h3>
+    <div class="folder-list" id="folderList"></div>
+    <h3>Playlists</h3>
+    <div class="playlist-list" id="playlistList"></div>
+    <div class="controls">
+      <button id="newPlaylistBtn">+ New Playlist</button>
+    </div>
+  </div>
 
-<!-- Sidebar -->
-<div id="sidebar">
-  <h2>Folders</h2>
-  <div id="folderList"></div>
-  <h2>Playlists</h2>
-  <div id="playlists"></div>
-  <button onclick="createPlaylist()">+ New Playlist</button>
-</div>
+  <!-- MAIN -->
+  <div class="main">
+    <div class="toolbar">
+      <div class="search">
+        <input id="search" placeholder="Search current folder / playlist..." />
+      </div>
+      <div class="small">Double-click a row to play • Click + to add to queue</div>
+    </div>
 
-<!-- Main -->
-<div id="main">
-  <input type="text" id="searchBar" placeholder="Search music..." oninput="filterFiles()">
-  <div id="fileList"></div>
-  <div id="nowPlaying">
-    <span id="nowPlayingTitle">No song playing</span>
-    <audio id="audioPlayer" controls></audio>
+    <div class="table-wrap">
+      <table class="track-table" id="trackTable" aria-label="Track list">
+        <thead>
+          <tr>
+            <th data-col="name">Name ▲</th>
+            <th data-col="mimeType">Type</th>
+            <th data-col="size">Size</th>
+            <th data-col="modifiedTime">Modified</th>
+            <th style="width:120px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tracksTbody"></tbody>
+      </table>
+    </div>
+
+    <div class="nowbar">
+      <div class="now-info" id="nowTitle">No song playing</div>
+
+      <div class="player-controls">
+        <button class="big-btn" id="prevBtn">⏮</button>
+        <button class="big-btn" id="playPauseBtn">▶️</button>
+        <button class="big-btn" id="nextBtn">⏭</button>
+        <button class="big-btn" id="shuffleBtn">🔀</button>
+        <button class="big-btn" id="repeatBtn">🔁</button>
+      </div>
+
+      <div class="seek">
+        <span id="curTime" class="small">0:00</span>
+        <input id="seek" type="range" min="0" max="100" value="0" />
+        <span id="durTime" class="small">0:00</span>
+      </div>
+
+      <div style="width:150px; display:flex; gap:8px; align-items:center;">
+        <input id="vol" type="range" min="0" max="1" step="0.01" value="1" style="width:100%;" />
+      </div>
+    </div>
   </div>
 </div>
 
+<!-- Hidden audio element -->
+<audio id="audio" crossorigin="anonymous"></audio>
+
 <script>
-// ===== CONFIG =====
-const API_KEY = "AIzaSyCoNrL7Omej-ct3IlB02OjTMhvtVFmy0b0";
+/* ======= CONFIG: your API key + folder IDs (user supplied) ======= */
+const API_KEY = "AIzaSyCoNrL7Omej-ct3IlB02OjTMhvtVFmy0b0"; // already provided
 const FOLDERS = [
-  { name: "Folder 1", id: "1tgOfvE-l9iBiXtzii8Xkx44U6mOwaItK" },
-  { name: "Folder 2", id: "1B3jfYcb7ikY-YiqUWNIFqU9GJd22MeVN" },
-  { name: "Folder 3", id: "1I0-pM0AbW2mSybBc6HVFuYMyFDQ2nasm" }
+  {name:"Folder 1", id:"1tgOfvE-l9iBiXtzii8Xkx44U6mOwaItK"},
+  {name:"Folder 2", id:"1B3jfYcb7ikY-YiqUWNIFqU9GJd22MeVN"},
+  {name:"Folder 3", id:"1I0-pM0AbW2mSybBc6HVFuYMyFDQ2nasm"}
 ];
+/* ============================================================ */
 
-// ===== STATE =====
-let currentFiles = [];
-let playlists = JSON.parse(localStorage.getItem("itunes_playlists") || "{}");
-let activePlaylist = null;
+/* STATE */
+let currentList = [];           // current folder's files shown (array of file objects)
+let sortBy = {col:'name', dir:1};// 1 = asc, -1 = desc
+let queue = JSON.parse(localStorage.getItem('gdrive_player_queue')||'[]'); // array of {id,name}
+let playlists = JSON.parse(localStorage.getItem('gdrive_player_playlists')||'{}'); // name -> array
+let activeFolder = null;        // currently selected folder object or playlist name (if playlist)
+let playlistMode = false;       // true when showing a playlist instead of folder
 
-// ===== INIT =====
-function init() {
-  renderFolderList();
-  renderPlaylists();
-  if (FOLDERS.length > 0) listFiles(FOLDERS[0].id);
+/* UI refs */
+const folderListEl = document.getElementById('folderList');
+const playlistListEl = document.getElementById('playlistList');
+const tbody = document.getElementById('tracksTbody');
+const audio = document.getElementById('audio');
+const nowTitle = document.getElementById('nowTitle');
+const searchEl = document.getElementById('search');
+const seekEl = document.getElementById('seek');
+const curTimeEl = document.getElementById('curTime');
+const durTimeEl = document.getElementById('durTime');
+const playPauseBtn = document.getElementById('playPauseBtn');
+const prevBtn = document.getElementById('prevBtn');
+const nextBtn = document.getElementById('nextBtn');
+const volEl = document.getElementById('vol');
+const shuffleBtn = document.getElementById('shuffleBtn');
+const repeatBtn = document.getElementById('repeatBtn');
+const newPlaylistBtn = document.getElementById('newPlaylistBtn');
+
+/* tiny util */
+function formatTime(s){
+  if(!s || isNaN(s)) return '0:00';
+  s = Math.floor(s);
+  const m = Math.floor(s/60), sec = s%60;
+  return m+':'+(sec<10?'0':'')+sec;
 }
 
-// ===== FOLDER LIST =====
-function renderFolderList() {
-  const flDiv = document.getElementById("folderList");
-  flDiv.innerHTML = "";
-  FOLDERS.forEach(f => {
-    const div = document.createElement("div");
-    div.classList.add("folder-select");
-    div.textContent = f.name;
-    div.onclick = () => {
-      activePlaylist = null;
-      listFiles(f.id);
-    };
-    flDiv.appendChild(div);
-  });
-}
-
-// ===== DRIVE LISTING =====
-async function listFiles(folderId) {
-  const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${API_KEY}&fields=files(id,name,mimeType)`;
-  const res = await fetch(url);
-  const data = await res.json();
-  currentFiles = data.files || [];
-  renderFileList(currentFiles);
-}
-
-// ===== RENDER FILE LIST =====
-function renderFileList(files) {
-  const fileListDiv = document.getElementById("fileList");
-  fileListDiv.innerHTML = "";
-  files.forEach(file => {
-    const div = document.createElement("div");
-    div.classList.add("item");
-    if (file.mimeType === "application/vnd.google-apps.folder") {
-      div.classList.add("folder");
-      div.textContent = "📁 " + file.name;
-      div.onclick = () => listFiles(file.id);
-    } else if (file.mimeType.startsWith("audio/")) {
-      div.innerHTML = `<span>${file.name}</span> <button onclick="addToPlaylistPrompt('${file.id}','${file.name}')">+</button>`;
-      div.onclick = (e) => {
-        if (!e.target.closest("button")) playFile(file.id, file.name);
-      };
+/* ================== Drive listing ================== */
+/* Get files in a folder (returns array of {id,name,mimeType,size,modifiedTime}) */
+async function listDriveFiles(folderId){
+  // fetch up to 1000 items; Drive API paginates if many items — simple loop
+  let files = [], pageToken = null;
+  do {
+    const url = new URL('https://www.googleapis.com/drive/v3/files');
+    const q = `'${folderId}' in parents and trashed=false`;
+    url.search = new URLSearchParams({
+      q: q,
+      key: API_KEY,
+      fields: 'nextPageToken, files(id,name,mimeType,size,modifiedTime)',
+      pageSize: 1000,
+      pageToken: pageToken || ''
+    });
+    const res = await fetch(url.toString());
+    if(!res.ok) {
+      const err = await res.text(); console.error('Drive list error', err);
+      throw new Error('Cannot list folder. Check API key, folder sharing, and console for errors.');
     }
-    fileListDiv.appendChild(div);
-  });
+    const data = await res.json();
+    files = files.concat(data.files || []);
+    pageToken = data.nextPageToken;
+  } while(pageToken);
+  return files;
 }
 
-// ===== PLAY AUDIO =====
-function playFile(fileId, name) {
-  const player = document.getElementById("audioPlayer");
-  player.src = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
-  player.play();
-  document.getElementById("nowPlayingTitle").textContent = name;
+/* Convert file id to a playback URL that avoids Drive viewer redirect:
+   drive.google.com/uc?export=download&id=FILEID
+   This works for public / link-shared files.
+*/
+function playbackUrl(fileId){
+  return `https://drive.google.com/uc?export=download&id=${fileId}`;
 }
 
-// ===== SEARCH =====
-function filterFiles() {
-  const term = document.getElementById("searchBar").value.toLowerCase();
-  const filtered = currentFiles.filter(f => f.name.toLowerCase().includes(term));
-  renderFileList(filtered);
-}
-
-// ===== PLAYLISTS =====
-function renderPlaylists() {
-  const plDiv = document.getElementById("playlists");
-  plDiv.innerHTML = "";
-  Object.keys(playlists).forEach(name => {
-    const div = document.createElement("div");
-    div.classList.add("playlist-item");
-    div.textContent = name;
-    div.onclick = () => {
-      activePlaylist = name;
-      renderFileList(playlists[name]);
+/* ================== Rendering ================== */
+function renderFolders(){
+  folderListEl.innerHTML = '';
+  FOLDERS.forEach((f, idx) => {
+    const d = document.createElement('div');
+    d.className = 'folder-item' + ((activeFolder && !playlistMode && activeFolder.id===f.id)?' active':'');
+    d.textContent = f.name;
+    d.onclick = async ()=> {
+      playlistMode = false;
+      activeFolder = f;
+      await loadFolder(f);
     };
-    plDiv.appendChild(div);
+    folderListEl.appendChild(d);
   });
 }
 
-function createPlaylist() {
-  const name = prompt("Playlist name:");
-  if (name && !playlists[name]) {
-    playlists[name] = [];
-    savePlaylists();
-    renderPlaylists();
+function renderPlaylists(){
+  playlistListEl.innerHTML = '';
+  for(const name of Object.keys(playlists)){
+    const d = document.createElement('div'); d.className='playlist-item'; d.textContent=name;
+    d.onclick = ()=> {
+      playlistMode = true;
+      activeFolder = name;
+      currentList = playlists[name].map(it=>({id:it.id,name:it.name,mimeType:it.mimeType || 'audio/*'}));
+      renderTable();
+    };
+    playlistListEl.appendChild(d);
   }
 }
 
-function addToPlaylistPrompt(id, name) {
-  const plName = prompt("Add to which playlist?");
-  if (plName) {
-    if (!playlists[plName]) playlists[plName] = [];
-    playlists[plName].push({id, name, mimeType: "audio/*"});
-    savePlaylists();
-    alert(`Added "${name}" to ${plName}`);
+/* render currentList into table, apply search + sort */
+function renderTable(){
+  const q = searchEl.value.trim().toLowerCase();
+  let list = currentList.slice();
+  if(q) list = list.filter(f=>f.name.toLowerCase().includes(q));
+  // sort
+  list.sort((a,b)=>{
+    const ca = (a[sortBy.col]||'').toString().toLowerCase();
+    const cb = (b[sortBy.col]||'').toString().toLowerCase();
+    if(ca<cb) return -1*sortBy.dir;
+    if(ca>cb) return 1*sortBy.dir;
+    return 0;
+  });
+
+  tbody.innerHTML = '';
+  list.forEach((f, i) => {
+    const tr = document.createElement('tr');
+    // double click plays
+    tr.ondblclick = ()=> playTrackByFile(f);
+    // single click highlights (optional)
+    const nameTd = document.createElement('td'); nameTd.textContent = f.name;
+    const typeTd = document.createElement('td'); typeTd.textContent = f.mimeType || '';
+    const sizeTd = document.createElement('td'); sizeTd.textContent = f.size ? (Math.round(f.size/1024) + ' KB') : '';
+    const modTd = document.createElement('td'); modTd.textContent = f.modifiedTime ? (new Date(f.modifiedTime)).toLocaleDateString() : '';
+    const actTd = document.createElement('td'); actTd.className='controls-cell';
+
+    const addBtn = document.createElement('button'); addBtn.textContent='+ Queue';
+    addBtn.onclick = (e) => { e.stopPropagation(); addToQueue(f); };
+
+    const plistBtn = document.createElement('button'); plistBtn.textContent='➕ Playlist';
+    plistBtn.onclick = (e)=> { e.stopPropagation(); addToPlaylistPrompt(f); };
+
+    actTd.appendChild(addBtn); actTd.appendChild(plistBtn);
+
+    tr.appendChild(nameTd); tr.appendChild(typeTd); tr.appendChild(sizeTd); tr.appendChild(modTd); tr.appendChild(actTd);
+    tbody.appendChild(tr);
+  });
+}
+
+/* ================== Loading folders ================== */
+async function loadFolder(folder){
+  try {
+    currentList = await listDriveFiles(folder.id);
+    renderTable();
+    renderFolders();
+  } catch(e){
+    alert('Error loading folder. Open console for details.');
+    console.error(e);
   }
 }
 
-function savePlaylists() {
-  localStorage.setItem("itunes_playlists", JSON.stringify(playlists));
+/* ================== Play / Queue ================== */
+function addToQueue(file){
+  queue.push({id:file.id, name:file.name, mimeType:file.mimeType});
+  localStorage.setItem('gdrive_player_queue', JSON.stringify(queue));
+  if(!audio.src || audio.paused) {
+    // if stopped, auto play the one we added
+    playQueueIndex(queue.length-1);
+  }
 }
 
-init();
+function playTrackByFile(file){
+  // insert target into queue, set index to it
+  queue.splice(currentQueueIndex()+1, 0, {id:file.id, name:file.name, mimeType:file.mimeType});
+  playQueueIndex(currentQueueIndex()+1);
+  localStorage.setItem('gdrive_player_queue', JSON.stringify(queue));
+}
+
+function addToPlaylistPrompt(file){
+  const name = prompt('Add to which playlist (type name or create new):','My Playlist');
+  if(!name) return;
+  if(!playlists[name]) playlists[name]=[];
+  playlists[name].push({id:file.id, name:file.name, mimeType:file.mimeType});
+  localStorage.setItem('gdrive_player_playlists', JSON.stringify(playlists));
+  renderPlaylists();
+  alert(`Added to ${name}`);
+}
+
+/* queue helpers */
+function currentQueueIndex(){
+  if(!audio.dataset.queueIndex) return -1;
+  return Number(audio.dataset.queueIndex);
+}
+
+function playQueueIndex(i){
+  if(i < 0 || i >= queue.length) { console.warn('queue index out of range'); return; }
+  const item = queue[i];
+  const url = playbackUrl(item.id);
+  audio.src = url;
+  audio.dataset.queueIndex = i;
+  audio.play().catch(e=>console.warn('play failed',e));
+  nowTitle.textContent = item.name;
+}
+
+/* prev/next logic */
+function playPrev(){
+  let idx = currentQueueIndex();
+  if(idx <= 0) return;
+  playQueueIndex(idx-1);
+}
+function playNext(){
+  let idx = currentQueueIndex();
+  if(repeatMode) {
+    // repeat current
+    playQueueIndex(idx);
+    return;
+  }
+  if(shuffleMode){
+    const r = Math.floor(Math.random()*queue.length);
+    playQueueIndex(r);
+    return;
+  }
+  if(idx < queue.length-1) playQueueIndex(idx+1);
+}
+
+/* ================== Player UI wiring ================== */
+let shuffleMode = false, repeatMode = false;
+shuffleBtn.onclick = ()=> { shuffleMode = !shuffleMode; shuffleBtn.style.background = shuffleMode ? '#dbeeff' : ''; };
+repeatBtn.onclick = ()=> { repeatMode = !repeatMode; repeatBtn.style.background = repeatMode ? '#dbeeff' : ''; };
+
+playPauseBtn.onclick = ()=> {
+  if(audio.paused) audio.play().catch(()=>{});
+  else audio.pause();
+};
+prevBtn.onclick = ()=> playPrev();
+nextBtn.onclick = ()=> playNext();
+
+audio.onplay = ()=> playPauseBtn.textContent='⏸';
+audio.onpause = ()=> playPauseBtn.textContent='▶️';
+audio.ontimeupdate = ()=>{
+  const cur = audio.currentTime || 0, dur = audio.duration || 0;
+  curTimeEl.textContent = formatTime(cur);
+  durTimeEl.textContent = formatTime(dur);
+  if(dur>0) seekEl.value = (cur/dur)*100;
+};
+seekEl.oninput = (e)=>{
+  if(!audio.duration) return;
+  const pct = Number(e.target.value)/100;
+  audio.currentTime = audio.duration * pct;
+};
+audio.onended = ()=> {
+  playNext();
+};
+
+/* volume */
+volEl.oninput = ()=> audio.volume = Number(volEl.value);
+
+/* initialize queue from localStorage */
+function ensureQueueHasIndex(){
+  if(queue.length && currentQueueIndex()===-1){
+    // start with first
+    playQueueIndex(0);
+  }
+}
+if(queue.length){
+  ensureQueueHasIndex();
+}
+
+/* ================== Columns sorting ================== */
+document.querySelectorAll('thead th[data-col]').forEach(th=>{
+  th.onclick = ()=>{
+    const col = th.dataset.col;
+    if(sortBy.col===col) sortBy.dir *= -1;
+    else { sortBy.col = col; sortBy.dir = 1; }
+    // update arrow
+    document.querySelectorAll('thead th[data-col]').forEach(h=>h.textContent = h.textContent.replace(/ ▲| ▼/g,''));
+    th.textContent = th.textContent.replace(/ ▲| ▼/g,'') + (sortBy.dir===1? ' ▲':' ▼');
+    renderTable();
+  };
+});
+
+/* ================== Search wiring ================== */
+searchEl.oninput = ()=> renderTable();
+
+/* ================== New playlist button ================== */
+newPlaylistBtn.onclick = ()=> {
+  const n = prompt('Playlist name:');
+  if(!n) return;
+  if(playlists[n]) { alert('Already exists'); return; }
+  playlists[n]=[];
+  localStorage.setItem('gdrive_player_playlists', JSON.stringify(playlists));
+  renderPlaylists();
+};
+
+/* ================== Keyboard shortcuts (space play/pause) ================== */
+document.addEventListener('keydown', (e)=>{
+  if(e.code==='Space' && e.target.tagName !== 'INPUT'){ e.preventDefault(); playPauseBtn.click(); }
+});
+
+/* ================== Startup: render UI and load first folder ================== */
+renderFolders();
+renderPlaylists();
+
+(async function start(){
+  // load first folder by default
+  if(FOLDERS.length>0){
+    activeFolder = FOLDERS[0];
+    try { currentList = await listDriveFiles(activeFolder.id); } catch(e){ console.error(e); alert('Failed to load default folder. Check folder sharing and API key.'); }
+    renderTable();
+    renderFolders();
+  }
+})();
+
+/* ================== Extra: convenience to clear queue/playlist (dev) - optional ================== */
+/* Uncomment if you want quick console helpers:
+window._q = ()=> { console.log(queue); };
+window._clearQueue = ()=> { queue=[]; localStorage.setItem('gdrive_player_queue','[]'); };
+*/
 </script>
 </body>
 </html>
