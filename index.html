@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>iTunes Style Multi-Folder Player</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  /* ===== iTunes-like Styling ===== */
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #eaeaea;
+    color: #000;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #sidebar {
+    width: 250px;
+    background: #f2f2f2;
+    border-right: 1px solid #ccc;
+    display: flex;
+    flex-direction: column;
+  }
+  #sidebar h2 {
+    font-size: 14px;
+    font-weight: bold;
+    padding: 8px;
+    margin: 0;
+    border-bottom: 1px solid #ccc;
+    background: #dcdcdc;
+  }
+  .folder-select, .playlist-item {
+    padding: 6px 10px;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .folder-select:hover, .playlist-item:hover {
+    background: #cce0ff;
+  }
+  #main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #searchBar {
+    padding: 8px;
+    border: none;
+    border-bottom: 1px solid #ccc;
+    font-size: 13px;
+  }
+  #fileList {
+    flex: 1;
+    overflow-y: auto;
+    background: white;
+  }
+  .item {
+    display: flex;
+    justify-content: space-between;
+    padding: 6px 10px;
+    border-bottom: 1px solid #eee;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .item:hover {
+    background: #f0f8ff;
+  }
+  .folder { font-weight: bold; }
+  #nowPlaying {
+    border-top: 1px solid #ccc;
+    background: #f2f2f2;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 13px;
+  }
+  audio {
+    flex: 1;
+  }
+  button {
+    border: none;
+    background: #ccc;
+    padding: 2px 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button:hover {
+    background: #bbb;
+  }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <h2>Folders</h2>
+  <div id="folderList"></div>
+  <h2>Playlists</h2>
+  <div id="playlists"></div>
+  <button onclick="createPlaylist()">+ New Playlist</button>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <input type="text" id="searchBar" placeholder="Search music..." oninput="filterFiles()">
+  <div id="fileList"></div>
+  <div id="nowPlaying">
+    <span id="nowPlayingTitle">No song playing</span>
+    <audio id="audioPlayer" controls></audio>
+  </div>
+</div>
+
+<script>
+// ===== CONFIG =====
+const API_KEY = "AIzaSyCoNrL7Omej-ct3IlB02OjTMhvtVFmy0b0";
+const FOLDERS = [
+  { name: "Folder 1", id: "1tgOfvE-l9iBiXtzii8Xkx44U6mOwaItK" },
+  { name: "Folder 2", id: "1B3jfYcb7ikY-YiqUWNIFqU9GJd22MeVN" },
+  { name: "Folder 3", id: "1I0-pM0AbW2mSybBc6HVFuYMyFDQ2nasm" }
+];
+
+// ===== STATE =====
+let currentFiles = [];
+let playlists = JSON.parse(localStorage.getItem("itunes_playlists") || "{}");
+let activePlaylist = null;
+
+// ===== INIT =====
+function init() {
+  renderFolderList();
+  renderPlaylists();
+  if (FOLDERS.length > 0) listFiles(FOLDERS[0].id);
+}
+
+// ===== FOLDER LIST =====
+function renderFolderList() {
+  const flDiv = document.getElementById("folderList");
+  flDiv.innerHTML = "";
+  FOLDERS.forEach(f => {
+    const div = document.createElement("div");
+    div.classList.add("folder-select");
+    div.textContent = f.name;
+    div.onclick = () => {
+      activePlaylist = null;
+      listFiles(f.id);
+    };
+    flDiv.appendChild(div);
+  });
+}
+
+// ===== DRIVE LISTING =====
+async function listFiles(folderId) {
+  const url = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${API_KEY}&fields=files(id,name,mimeType)`;
+  const res = await fetch(url);
+  const data = await res.json();
+  currentFiles = data.files || [];
+  renderFileList(currentFiles);
+}
+
+// ===== RENDER FILE LIST =====
+function renderFileList(files) {
+  const fileListDiv = document.getElementById("fileList");
+  fileListDiv.innerHTML = "";
+  files.forEach(file => {
+    const div = document.createElement("div");
+    div.classList.add("item");
+    if (file.mimeType === "application/vnd.google-apps.folder") {
+      div.classList.add("folder");
+      div.textContent = "📁 " + file.name;
+      div.onclick = () => listFiles(file.id);
+    } else if (file.mimeType.startsWith("audio/")) {
+      div.innerHTML = `<span>${file.name}</span> <button onclick="addToPlaylistPrompt('${file.id}','${file.name}')">+</button>`;
+      div.onclick = (e) => {
+        if (!e.target.closest("button")) playFile(file.id, file.name);
+      };
+    }
+    fileListDiv.appendChild(div);
+  });
+}
+
+// ===== PLAY AUDIO =====
+function playFile(fileId, name) {
+  const player = document.getElementById("audioPlayer");
+  player.src = `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media&key=${API_KEY}`;
+  player.play();
+  document.getElementById("nowPlayingTitle").textContent = name;
+}
+
+// ===== SEARCH =====
+function filterFiles() {
+  const term = document.getElementById("searchBar").value.toLowerCase();
+  const filtered = currentFiles.filter(f => f.name.toLowerCase().includes(term));
+  renderFileList(filtered);
+}
+
+// ===== PLAYLISTS =====
+function renderPlaylists() {
+  const plDiv = document.getElementById("playlists");
+  plDiv.innerHTML = "";
+  Object.keys(playlists).forEach(name => {
+    const div = document.createElement("div");
+    div.classList.add("playlist-item");
+    div.textContent = name;
+    div.onclick = () => {
+      activePlaylist = name;
+      renderFileList(playlists[name]);
+    };
+    plDiv.appendChild(div);
+  });
+}
+
+function createPlaylist() {
+  const name = prompt("Playlist name:");
+  if (name && !playlists[name]) {
+    playlists[name] = [];
+    savePlaylists();
+    renderPlaylists();
+  }
+}
+
+function addToPlaylistPrompt(id, name) {
+  const plName = prompt("Add to which playlist?");
+  if (plName) {
+    if (!playlists[plName]) playlists[plName] = [];
+    playlists[plName].push({id, name, mimeType: "audio/*"});
+    savePlaylists();
+    alert(`Added "${name}" to ${plName}`);
+  }
+}
+
+function savePlaylists() {
+  localStorage.setItem("itunes_playlists", JSON.stringify(playlists));
+}
+
+init();
+</script>
+</body>
+</html>
