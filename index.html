@@ -3,215 +3,377 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Simple Multi-Folder Music Player</title>
+<title>Fancy Multi-level Google Drive Music Browser</title>
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+  /* Reset */
+  * {
+    box-sizing: border-box;
+  }
   body {
-    font-family: Arial, sans-serif;
-    margin:0; padding:0;
-    background: #fff;
-    color: #111;
-    transition: background 0.3s, color 0.3s;
+    margin: 0; padding: 0;
+    font-family: 'Inter', sans-serif;
+    background: #fafafa;
+    color: #222;
+    transition: background-color 0.3s ease, color 0.3s ease;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
   }
   body.dark {
     background: #121212;
-    color: #eee;
-  }
-  header {
-    padding: 10px 20px;
-    background: #007bff;
-    color: white;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-  header button {
-    padding: 6px 12px;
-    cursor: pointer;
-    border:none;
-    border-radius: 4px;
-    background: #0056b3;
-    color: white;
-    font-size: 14px;
-  }
-  header button:hover {
-    background: #003d80;
-  }
-  #folders {
-    display: flex;
-    gap: 20px;
-    padding: 20px;
-    justify-content: center;
-  }
-  .folder {
-    padding: 12px 24px;
-    background: #f0f0f0;
-    border-radius: 8px;
-    cursor: pointer;
-    user-select: none;
-    font-weight: bold;
-    color: #333;
-    transition: background 0.2s, color 0.2s;
-  }
-  body.dark .folder {
-    background: #333;
     color: #ddd;
   }
-  .folder.active {
-    background: #007bff;
+
+  header {
+    position: sticky;
+    top: 0;
+    background: #1e88e5;
     color: white;
+    padding: 15px 30px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.2);
+    z-index: 100;
   }
-  main {
-    max-width: 600px;
+  header h1 {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1.5rem;
+  }
+  #darkModeToggle {
+    background: #1565c0;
+    border: none;
+    color: white;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  #darkModeToggle:hover {
+    background: #0d3c72;
+  }
+
+  #breadcrumbs {
+    margin: 20px auto 10px;
+    max-width: 720px;
+    padding: 0 20px;
+    font-size: 0.95rem;
+    user-select: none;
+    color: #555;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  body.dark #breadcrumbs {
+    color: #aaa;
+  }
+  #breadcrumbs span {
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.25s ease;
+  }
+  #breadcrumbs span:hover {
+    background: #e3f2fd;
+  }
+  body.dark #breadcrumbs span:hover {
+    background: #2a3a5b;
+  }
+  #breadcrumbs span.current {
+    font-weight: 600;
+    cursor: default;
+    background: #e0e0e0;
+  }
+  body.dark #breadcrumbs span.current {
+    background: #333;
+  }
+
+  #content {
+    max-width: 720px;
     margin: 0 auto 40px;
     padding: 0 20px;
+    flex-grow: 1;
   }
-  ul#songList {
+  ul.file-list {
     list-style: none;
     padding: 0;
+    margin: 0;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgb(0 0 0 / 0.1);
+    background: white;
+    overflow: hidden;
   }
-  ul#songList li {
-    margin: 8px 0;
-    padding: 8px 12px;
-    background: #f9f9f9;
-    border-radius: 6px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: #222;
-  }
-  body.dark ul#songList li {
+  body.dark ul.file-list {
     background: #222;
-    color: #ddd;
+    box-shadow: 0 2px 10px rgb(0 0 0 / 0.7);
   }
-  ul#songList li button {
+  ul.file-list li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 20px;
+    border-bottom: 1px solid #ddd;
     cursor: pointer;
-    padding: 6px 12px;
+    transition: background-color 0.25s ease;
+  }
+  body.dark ul.file-list li {
+    border-color: #444;
+  }
+  ul.file-list li:hover {
+    background: #e3f2fd;
+  }
+  body.dark ul.file-list li:hover {
+    background: #2a3a5b;
+  }
+  ul.file-list li:last-child {
+    border-bottom: none;
+  }
+  ul.file-list li .file-name {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 500;
+    user-select: none;
+  }
+  ul.file-list li .icon {
+    font-size: 1.4rem;
+    color: #1976d2;
+  }
+  body.dark ul.file-list li .icon {
+    color: #90caf9;
+  }
+  ul.file-list li button.play-btn {
+    background: #1976d2;
     border: none;
-    border-radius: 4px;
-    background: #007bff;
     color: white;
-    font-weight: bold;
+    padding: 6px 16px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
   }
-  ul#songList li button:hover {
-    background: #0056b3;
+  ul.file-list li button.play-btn:hover {
+    background: #125ea8;
   }
-  audio {
+
+  audio#audioPlayer {
     width: 100%;
-    margin-top: 20px;
-    outline:none;
+    max-width: 720px;
+    margin: 0 auto 20px;
+    display: block;
+    outline: none;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+    background: white;
+  }
+  body.dark audio#audioPlayer {
+    background: #222;
+    box-shadow: 0 4px 16px rgb(0 0 0 / 0.7);
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    #darkModeToggle {
+      width: 100%;
+    }
+    #breadcrumbs {
+      font-size: 0.9rem;
+      margin: 15px auto 10px;
+    }
   }
 </style>
 </head>
 <body>
 <header>
-  <div>Simple Music Player</div>
-  <button id="darkModeToggle">Toggle Dark Mode</button>
+  <h1>Music Browser</h1>
+  <button id="darkModeToggle">Dark Mode</button>
 </header>
 
-<section id="folders" aria-label="Music folders">
-  <div class="folder" data-folder="0">Playboi Carti</div>
-  <div class="folder" data-folder="1">Ken Carson</div>
-  <div class="folder" data-folder="2">destroy lonely</div>
+<nav id="breadcrumbs" aria-label="Breadcrumb"></nav>
+
+<section id="content" aria-live="polite" aria-atomic="true">
+  <ul class="file-list" id="fileList"></ul>
 </section>
 
-<main>
-  <h2 id="folderTitle">Select a folder to load songs</h2>
-  <ul id="songList" aria-live="polite" aria-relevant="additions"></ul>
-  <audio id="audioPlayer" controls></audio>
-</main>
+<audio id="audioPlayer" controls></audio>
 
 <script>
-const API_KEY = "AIzaSyCoNrL7Omej-ct3IlB02OjTMhvtVFmy0b0";
-const FOLDERS = [
-  { name: "Playboi Carti", id: "1tgOfvE-l9iBiXtzii8Xkx44U6mOwaItK" },
-  { name: "Ken Carson", id: "1B3jfYcb7ikY-YiqUWNIFqU9GJd22MeVN" },
-  { name: "destroy lonely", id: "1I0-pM0AbW2mSybBc6HVFuYMyFDQ2nasm" }
-];
+  const API_KEY = "AIzaSyCoNrL7Omej-ct3IlB02OjTMhvtVFmy0b0";
+  const ROOT_FOLDERS = [
+    { name: "Playboi Carti", id: "1tgOfvE-l9iBiXtzii8Xkx44U6mOwaItK" },
+    { name: "Ken Carson", id: "1B3jfYcb7ikY-YiqUWNIFqU9GJd22MeVN" },
+    { name: "destroy lonely", id: "1I0-pM0AbW2mSybBc6HVFuYMyFDQ2nasm" }
+  ];
 
-const folderEls = document.querySelectorAll(".folder");
-const folderTitle = document.getElementById("folderTitle");
-const songListEl = document.getElementById("songList");
-const audioPlayer = document.getElementById("audioPlayer");
-const darkModeToggle = document.getElementById("darkModeToggle");
+  // State for current path: array of {name, id} from root to current folder
+  let currentPath = [];
 
-let currentFolderIndex = null;
+  const breadcrumbsEl = document.getElementById('breadcrumbs');
+  const fileListEl = document.getElementById('fileList');
+  const audioPlayer = document.getElementById('audioPlayer');
+  const darkModeToggle = document.getElementById('darkModeToggle');
 
-async function listFiles(folderId) {
-  const files = [];
-  let pageToken = null;
-  do {
-    let url = new URL("https://www.googleapis.com/drive/v3/files");
-    const query = `'${folderId}' in parents and trashed=false and mimeType contains 'audio/'`;
+  // Helper: get download URL for audio file
+  function getDownloadUrl(fileId) {
+    return `https://drive.google.com/uc?export=download&id=${fileId}`;
+  }
+
+  // Helper: fetch folder contents from Drive API (files and folders)
+  async function fetchFolderContents(folderId) {
+    const q = `'${folderId}' in parents and trashed=false`;
+    const url = new URL('https://www.googleapis.com/drive/v3/files');
     url.search = new URLSearchParams({
-      q: query,
+      q,
       key: API_KEY,
-      fields: "nextPageToken, files(id,name,mimeType)",
-      pageSize: 1000,
-      pageToken: pageToken || ""
+      fields: 'files(id,name,mimeType,kind)',
+      pageSize: 1000
     });
     const res = await fetch(url);
     if (!res.ok) {
-      alert("Error loading folder files. Check API key and folder sharing.");
+      alert('Failed to load folder contents. Check API key, folder sharing, and quota.');
       return [];
     }
     const data = await res.json();
-    files.push(...(data.files || []));
-    pageToken = data.nextPageToken;
-  } while (pageToken);
-  return files;
-}
-
-function getDownloadLink(fileId) {
-  return `https://drive.google.com/uc?export=download&id=${fileId}`;
-}
-
-function clearActiveFolder() {
-  folderEls.forEach(el => el.classList.remove("active"));
-}
-
-async function loadFolder(index) {
-  clearActiveFolder();
-  folderEls[index].classList.add("active");
-  currentFolderIndex = index;
-  folderTitle.textContent = `Songs in "${FOLDERS[index].name}"`;
-  songListEl.innerHTML = "<li>Loading songs...</li>";
-  const files = await listFiles(FOLDERS[index].id);
-  if (!files.length) {
-    songListEl.innerHTML = "<li>No audio files found.</li>";
-    audioPlayer.src = "";
-    return;
+    return data.files || [];
   }
-  songListEl.innerHTML = "";
-  files.forEach(file => {
-    const li = document.createElement("li");
-    li.textContent = file.name;
-    const btn = document.createElement("button");
-    btn.textContent = "Play";
-    btn.onclick = () => {
-      audioPlayer.src = getDownloadLink(file.id);
-      audioPlayer.play().catch(e => {
-        alert("Playback failed. Possibly due to Google Drive restrictions (CORS).");
-        console.error(e);
-      });
-    };
-    li.appendChild(btn);
-    songListEl.appendChild(li);
+
+  // Render breadcrumbs navigation
+  function renderBreadcrumbs() {
+    breadcrumbsEl.innerHTML = '';
+    // Root link
+    const rootSpan = document.createElement('span');
+    rootSpan.textContent = 'Home';
+    rootSpan.style.fontWeight = '600';
+    rootSpan.addEventListener('click', () => {
+      currentPath = [];
+      renderBreadcrumbs();
+      renderFolderList(ROOT_FOLDERS);
+    });
+    breadcrumbsEl.appendChild(rootSpan);
+
+    currentPath.forEach((folder, i) => {
+      const sep = document.createElement('span');
+      sep.textContent = '›';
+      sep.style.margin = '0 5px';
+      breadcrumbsEl.appendChild(sep);
+
+      const span = document.createElement('span');
+      span.textContent = folder.name;
+      if (i === currentPath.length - 1) {
+        span.classList.add('current');
+        span.style.cursor = 'default';
+      } else {
+        span.style.cursor = 'pointer';
+        span.addEventListener('click', () => {
+          currentPath = currentPath.slice(0, i + 1);
+          renderBreadcrumbs();
+          loadFolder(currentPath[currentPath.length - 1].id);
+        });
+      }
+      breadcrumbsEl.appendChild(span);
+    });
+  }
+
+  // Render a list of folders and files (files with audio mime type get play button)
+  function renderFolderList(items) {
+    fileListEl.innerHTML = '';
+    if (!items.length) {
+      const li = document.createElement('li');
+      li.textContent = 'No items found in this folder.';
+      li.style.textAlign = 'center';
+      li.style.color = '#888';
+      fileListEl.appendChild(li);
+      return;
+    }
+    items.forEach(item => {
+      const li = document.createElement('li');
+      const nameDiv = document.createElement('div');
+      nameDiv.className = 'file-name';
+
+      // Folder or file icon (📁 or 🎵)
+      const iconSpan = document.createElement('span');
+      iconSpan.className = 'icon';
+      if (item.mimeType === 'application/vnd.google-apps.folder') {
+        iconSpan.textContent = '📁';
+      } else if (item.mimeType && item.mimeType.startsWith('audio/')) {
+        iconSpan.textContent = '🎵';
+      } else {
+        // skip other file types
+        return;
+      }
+      nameDiv.appendChild(iconSpan);
+
+      const textSpan = document.createElement('span');
+      textSpan.textContent = item.name;
+      nameDiv.appendChild(textSpan);
+      li.appendChild(nameDiv);
+
+      if (item.mimeType === 'application/vnd.google-apps.folder') {
+        // Folder: click to open
+        li.style.cursor = 'pointer';
+        li.addEventListener('click', () => {
+          currentPath.push({ name: item.name, id: item.id });
+          renderBreadcrumbs();
+          loadFolder(item.id);
+        });
+      } else {
+        // Audio file: add play button
+        const playBtn = document.createElement('button');
+        playBtn.textContent = 'Play';
+        playBtn.className = 'play-btn';
+        playBtn.addEventListener('click', e => {
+          e.stopPropagation();
+          audioPlayer.src = getDownloadUrl(item.id);
+          audioPlayer.play().catch(err => {
+            alert('Playback failed. This may be due to Google Drive CORS restrictions.');
+            console.error(err);
+          });
+        });
+        li.appendChild(playBtn);
+      }
+
+      fileListEl.appendChild(li);
+    });
+  }
+
+  // Load folder contents by folder ID
+  async function loadFolder(folderId) {
+    fileListEl.innerHTML = '<li>Loading...</li>';
+    const items = await fetchFolderContents(folderId);
+    // Filter only folders and audio files
+    const filtered = items.filter(i =>
+      i.mimeType === 'application/vnd.google-apps.folder' ||
+      (i.mimeType && i.mimeType.startsWith('audio/'))
+    );
+    renderFolderList(filtered);
+  }
+
+  // Initialization
+  function init() {
+    renderBreadcrumbs();
+    renderFolderList(ROOT_FOLDERS);
+  }
+
+  // Dark mode toggle logic
+  darkModeToggle.addEventListener('click', () => {
+    document.body.classList.toggle('dark');
+    if (document.body.classList.contains('dark')) {
+      darkModeToggle.textContent = 'Light Mode';
+    } else {
+      darkModeToggle.textContent = 'Dark Mode';
+    }
   });
-}
 
-folderEls.forEach((el, i) => {
-  el.addEventListener("click", () => loadFolder(i));
-});
-
-// Dark mode toggle
-darkModeToggle.addEventListener("click", () => {
-  document.body.classList.toggle("dark");
-  if(document.body.classList.contains("dark")){
-    darkModeToggle.textContent = "Light Mode";
-  } else {
-    darkModeToggle.textContent = "Dark Mode";
-  }
-});
+  init();
 </script>
 </body>
 </html>
