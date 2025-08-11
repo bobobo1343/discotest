@@ -6,13 +6,13 @@
 <title>Google Drive Music Browser</title>
 <style>
   body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    margin:0; padding:0;
-    background: #fafafa;
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 0;
+    background: #f0f0f0;
     color: #222;
+    min-height: 100vh;
     display: flex;
     flex-direction: column;
-    min-height: 100vh;
     transition: background-color 0.3s, color 0.3s;
   }
   body.dark {
@@ -28,83 +28,79 @@
     align-items: center;
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 100;
   }
   header h1 {
     margin: 0;
-    font-weight: 700;
   }
   #darkToggle {
     background: #005a9e;
     border: none;
     color: white;
     padding: 8px 16px;
-    border-radius: 5px;
+    border-radius: 6px;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: bold;
   }
   #darkToggle:hover {
     background: #003d6a;
   }
   nav#breadcrumbs {
-    margin: 15px auto 5px;
-    max-width: 720px;
-    padding: 0 20px;
+    padding: 10px 30px;
+    background: #e0e0e0;
     font-size: 14px;
-    color: #555;
     user-select: none;
   }
   body.dark nav#breadcrumbs {
-    color: #bbb;
+    background: #222;
   }
   nav#breadcrumbs span {
     cursor: pointer;
     padding: 3px 8px;
     border-radius: 4px;
-    user-select: none;
-    transition: background-color 0.2s ease;
+    margin-right: 5px;
+    display: inline-block;
   }
   nav#breadcrumbs span:hover {
-    background-color: #cce6ff;
+    background: #b0d4ff;
   }
   body.dark nav#breadcrumbs span:hover {
-    background-color: #234466;
+    background: #1a3b6f;
   }
   nav#breadcrumbs span.current {
-    font-weight: 600;
     cursor: default;
-    background-color: #ddd;
+    font-weight: bold;
+    background: #ccc;
   }
   body.dark nav#breadcrumbs span.current {
-    background-color: #333;
+    background: #444;
   }
   main#content {
     flex-grow: 1;
     max-width: 720px;
-    margin: 0 auto 30px;
-    padding: 0 20px;
+    margin: 20px auto 40px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    padding: 20px;
+  }
+  body.dark main#content {
+    background: #222;
+    box-shadow: 0 0 20px rgba(0,0,0,0.8);
   }
   ul#fileList {
     list-style: none;
-    padding: 0;
     margin: 0;
-    background: white;
-    box-shadow: 0 0 12px rgba(0,0,0,0.1);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  body.dark ul#fileList {
-    background: #222;
-    box-shadow: 0 0 14px rgba(0,0,0,0.7);
+    padding: 0;
   }
   ul#fileList li {
+    padding: 12px 15px;
+    border-bottom: 1px solid #ddd;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px 20px;
-    border-bottom: 1px solid #eee;
     cursor: pointer;
-    transition: background-color 0.25s ease;
+    transition: background-color 0.2s;
   }
   body.dark ul#fileList li {
     border-color: #444;
@@ -113,7 +109,7 @@
     background: #e6f2ff;
   }
   body.dark ul#fileList li:hover {
-    background: #1e3a5f;
+    background: #1a3b6f;
   }
   ul#fileList li:last-child {
     border-bottom: none;
@@ -122,10 +118,9 @@
     display: flex;
     align-items: center;
     gap: 12px;
-    font-weight: 500;
   }
   ul#fileList li .icon {
-    font-size: 20px;
+    font-size: 18px;
     color: #007acc;
   }
   body.dark ul#fileList li .icon {
@@ -136,10 +131,10 @@
     border: none;
     color: white;
     padding: 6px 14px;
-    border-radius: 5px;
-    font-weight: 600;
+    border-radius: 6px;
     cursor: pointer;
-    transition: background-color 0.3s ease;
+    font-weight: bold;
+    transition: background-color 0.3s;
   }
   button.playBtn:hover {
     background: #005a9e;
@@ -147,26 +142,10 @@
   audio#audioPlayer {
     width: 100%;
     max-width: 720px;
-    margin: 0 auto 25px;
+    margin: 0 auto 20px;
     display: block;
     border-radius: 8px;
-    box-shadow: 0 0 15px rgba(0,0,0,0.1);
     outline: none;
-    background: white;
-  }
-  body.dark audio#audioPlayer {
-    background: #222;
-    box-shadow: 0 0 18px rgba(0,0,0,0.7);
-  }
-  @media (max-width: 480px) {
-    header {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 10px;
-    }
-    #darkToggle {
-      width: 100%;
-    }
   }
 </style>
 </head>
@@ -184,6 +163,7 @@
 <script>
   const API_KEY = "AIzaSyCoNrL7Omej-ct3IlB02OjTMhvtVFmy0b0";
 
+  // Root folders from your message
   const ROOT_FOLDERS = [
     { name: "Playboi Carti", id: "1tgOfvE-l9iBiXtzii8Xkx44U6mOwaItK" },
     { name: "Ken Carson", id: "1B3jfYcb7ikY-YiqUWNIFqU9GJd22MeVN" },
@@ -202,10 +182,10 @@
   }
 
   async function fetchFolderContents(folderId) {
-    const query = `'${folderId}' in parents and trashed=false`;
+    const q = `'${folderId}' in parents and trashed = false`;
     const url = new URL("https://www.googleapis.com/drive/v3/files");
     url.search = new URLSearchParams({
-      q: query,
+      q,
       key: API_KEY,
       fields: "files(id,name,mimeType)",
       pageSize: 1000,
@@ -214,22 +194,23 @@
     try {
       const res = await fetch(url);
       if (!res.ok) {
-        throw new Error("Failed to fetch folder contents");
+        throw new Error("Failed to fetch folder contents. Check your API key and folder sharing.");
       }
       const data = await res.json();
       return data.files || [];
-    } catch (error) {
-      alert("Error loading folder contents: " + error.message);
+    } catch (err) {
+      alert(err.message);
       return [];
     }
   }
 
   function renderBreadcrumbs() {
     breadcrumbsEl.innerHTML = "";
-    // Home breadcrumb
+
+    // Home link
     const homeSpan = document.createElement("span");
     homeSpan.textContent = "Home";
-    homeSpan.style.fontWeight = "600";
+    homeSpan.style.fontWeight = "bold";
     homeSpan.addEventListener("click", () => {
       currentPath = [];
       renderBreadcrumbs();
@@ -260,9 +241,9 @@
 
   function renderFolderList(items) {
     fileListEl.innerHTML = "";
-    if (!items.length) {
+    if (items.length === 0) {
       const li = document.createElement("li");
-      li.textContent = "No items found.";
+      li.textContent = "No items found in this folder.";
       li.style.textAlign = "center";
       li.style.color = "#888";
       fileListEl.appendChild(li);
@@ -270,7 +251,7 @@
     }
 
     items.forEach((item) => {
-      // Show only folders and audio files
+      // Only show folders and audio files
       if (
         item.mimeType !== "application/vnd.google-apps.folder" &&
         !(item.mimeType && item.mimeType.startsWith("audio/"))
@@ -285,11 +266,8 @@
 
       const iconSpan = document.createElement("span");
       iconSpan.className = "icon";
-      if (item.mimeType === "application/vnd.google-apps.folder") {
-        iconSpan.textContent = "📁";
-      } else {
-        iconSpan.textContent = "🎵";
-      }
+      iconSpan.textContent =
+        item.mimeType === "application/vnd.google-apps.folder" ? "📁" : "🎵";
 
       const textSpan = document.createElement("span");
       textSpan.textContent = item.name;
@@ -315,7 +293,7 @@
           audioPlayer.src = getDownloadUrl(item.id);
           audioPlayer.play().catch(() => {
             alert(
-              "Playback failed. This might be due to Google Drive CORS restrictions."
+              "Playback failed. This is often due to Google Drive CORS restrictions."
             );
           });
         });
@@ -328,8 +306,8 @@
 
   async function loadFolder(folderId) {
     fileListEl.innerHTML = "<li>Loading...</li>";
-    const contents = await fetchFolderContents(folderId);
-    renderFolderList(contents);
+    const items = await fetchFolderContents(folderId);
+    renderFolderList(items);
   }
 
   darkToggle.addEventListener("click", () => {
@@ -339,8 +317,8 @@
       : "Dark Mode";
   });
 
-  // Initialize on page load
   window.onload = () => {
+    currentPath = [];
     renderBreadcrumbs();
     renderFolderList(ROOT_FOLDERS);
   };
